@@ -1,6 +1,6 @@
 # AnyClaw
 
-By wrapping up claude code(claude -p) and standing on the shoulders of giants, you can use any model with CC-switch.
+By wrapping up claude code(claude -p) and standing on the shoulders of giants, you can use any model with [cc-switch](https://github.com/farion1231/cc-switch).
 
 # Claude Local API Server
 
