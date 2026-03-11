@@ -2,6 +2,135 @@
 
 By wrapping up claude code(claude -p) and standing on the shoulders of giants, you can use any model with [cc-switch](https://github.com/farion1231/cc-switch).
 
+
+# Claude CLI — Local API Wrapper
+
+> Wrap any LLM client around `claude -p`
+
+---
+
+## Architecture
+
+```mermaid
+flowchart TD
+    A["🦞  Any LLM Client
+    ─────────────────────────────
+    CherryStudio · OpenAI SDK
+    curl · Your App"]
+
+    B["🖥️  Local API Server
+    ─────────────────────────────
+    http://127.0.0.1:8080
+    server.py"]
+
+    C["⚡  claude -p
+    ─────────────────────────────
+    Claude Code CLI"]
+
+    D["🔀  cc-switch
+    ─────────────────────────────
+    Model Switcher"]
+
+    E["☁️  Anthropic API
+    ─────────────────────────────
+    api.anthropic.com"]
+
+    A -->|"POST /v1/chat/completions
+    POST /v1/messages
+    OpenAI · Anthropic format"| B
+
+    B -->|"bash: source venv/bin/activate
+    && claude -p '...'
+    + HTTP_PROXY injected"| C
+
+    D -.->|"switch active model
+    no restart needed"| C
+
+    C -->|"HTTPS
+    via proxy 127.0.0.1:7890"| E
+```
+
+---
+
+## Request Flow
+
+```mermaid
+sequenceDiagram
+    participant Client as 🦞 LLM Client
+    participant API    as 🖥️ Local API Server
+    participant Shell  as 🐚 bash subprocess
+    participant CLI    as ⚡ claude -p
+    participant Remote as ☁️ Anthropic API
+
+    Client->>API: POST /v1/chat/completions<br/>(stream: true/false)
+    API->>API: Parse format (OpenAI / Anthropic)
+    API->>API: Build plain-text prompt
+    API->>API: Acquire Semaphore slot
+    API->>Shell: source venv/bin/activate<br/>&& claude -p '...'
+    Shell->>CLI: exec with proxy env vars
+    CLI->>Remote: HTTPS request
+    Remote-->>CLI: response
+    CLI-->>Shell: stdout
+    Shell-->>API: captured output
+    API->>API: Release Semaphore slot
+    alt stream = true
+        API-->>Client: SSE chunks (text/event-stream)
+    else stream = false
+        API-->>Client: JSON response
+    end
+```
+
+---
+
+## Concurrency Model
+
+```mermaid
+flowchart LR
+    R1[Request 1] --> T1[Thread 1]
+    R2[Request 2] --> T2[Thread 2]
+    R3[Request 3] --> T3[Thread 3]
+    R4[Request 4] --> T4[Thread 4]
+    RN[Request N] --> TN[Thread N]
+
+    subgraph HTTP ["HTTP Layer — ThreadingMixIn (unlimited threads)"]
+        T1
+        T2
+        T3
+        T4
+        TN
+    end
+
+    subgraph SEM ["Semaphore(N) — max N claude processes"]
+        T1 --> P1[claude -p]
+        T2 --> P2[claude -p]
+        T3 --> WAIT1[queued ...]
+        T4 --> WAIT2[queued ...]
+        TN --> WAITN[queued ...]
+    end
+
+    P1 --> ANT[Anthropic API]
+    P2 --> ANT
+```
+
+---
+
+## Model Switching with `cc-switch`
+
+```mermaid
+flowchart LR
+    CC["cc-switch"] -->|select| M1["claude-opus-4"]
+    CC -->|select| M2["claude-sonnet-4  ✅ active"]
+    CC -->|select| M3["claude-3-5-sonnet"]
+    CC -->|select| M4["claude-haiku-4-5"]
+
+    M2 -->|used by all subsequent| CLI["claude -p '...'"]
+```
+
+> Switch once → every following `claude -p` call uses the new model automatically. No server restart required.
+
+---
+
+
 # Claude Local API Server
 
 A local API server that wraps the `claude -p` CLI, exposing both **OpenAI-compatible** and **Anthropic-compatible** HTTP endpoints. Designed to work with clients like [CherryStudio](https://github.com/kangfenmao/cherry-studio), `curl`, or any OpenAI SDK.
