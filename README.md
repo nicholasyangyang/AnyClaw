@@ -1,11 +1,7 @@
-# AnyClaw
+# AnyClaw 🦞 — Architecture
 
-By wrapping up claude code(claude -p) and standing on the shoulders of giants, you can use any model with [cc-switch](https://github.com/farion1231/cc-switch).
-
-
-# Claude CLI — Local API Wrapper
-
-> Wrap any LLM client around `claude -p`
+> By wrapping up `claude -p` and standing on the shoulders of giants,  
+> you can use any model with [cc-switch](https://github.com/farion1231/cc-switch).
 
 ---
 
